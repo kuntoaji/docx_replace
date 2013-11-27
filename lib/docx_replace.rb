@@ -4,10 +4,14 @@ require 'tempfile'
 
 module DocxReplace
   class Doc
-    def initialize(path, temp_dir=nil)
-      @zip_file = Zip::File.new(path)
-      @temp_dir = temp_dir
-      read_docx_file
+    DOCUMENT_FILE_PATH = 'word/document.xml'
+
+    def initialize(source, target, &block)
+      @zip_file = Zip::File.new(source)
+      @temp_file = Tempfile.new('docxedit-')
+      @document_content = @zip_file.read(DOCUMENT_FILE_PATH)
+      @target = target
+      block.call(self) if block_given?
     end
 
     def replace(pattern, replacement, multiple_occurrences=false)
@@ -18,24 +22,8 @@ module DocxReplace
       end
     end
 
-    def commit(new_path=nil)
-      write_back_to_file(new_path)
-    end
-
-    private
-    DOCUMENT_FILE_PATH = 'word/document.xml'
-
-    def read_docx_file
-      @document_content = @zip_file.read(DOCUMENT_FILE_PATH)
-    end
-
-    def write_back_to_file(new_path=nil)
-      if @temp_dir.nil?
-        temp_file = Tempfile.new('docxedit-')
-      else
-        temp_file = Tempfile.new('docxedit-', @temp_dir)
-      end
-      Zip::OutputStream.open(temp_file.path) do |zos|
+    def commit
+      Zip::OutputStream.open(@temp_file.path) do |zos|
         @zip_file.entries.each do |e|
           unless e.name == DOCUMENT_FILE_PATH
             zos.put_next_entry(e.name)
@@ -47,14 +35,10 @@ module DocxReplace
         zos.print @document_content
       end
 
-      if new_path.nil?
-        path = @zip_file.name
-        FileUtils.rm(path)
-      else
-        path = new_path
-      end
-      FileUtils.mv(temp_file.path, path)
-      @zip_file = Zip::File.new(path)
+      FileUtils.mv(@temp_file.path, @target)
+      @temp_file.close
+      @temp_file.unlink
+      @target
     end
   end
 end

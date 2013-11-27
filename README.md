@@ -24,26 +24,34 @@ Inside of a rails controller, your code might look something like this:
 
 ```ruby
 def user_report
+  # Rails
   @user = User.find(params[:user_id])
 
   respond_to do |format|
     format.docx do
       # Initialize DocxReplace with your template
-      doc = DocxReplace::Doc.new("#{Rails.root}/lib/docx_templates/my_template.docx", "#{Rails.root}/tmp")
+      doc = DocxReplace::Doc.new("#{Rails.root}/lib/docx_templates/my_template.docx", "#{Rails.root}/tmp/result.docx")
 
       # Replace some variables. $var$ convention is used here, but not required.
       doc.replace("$first_name$", @user.first_name)
       doc.replace("$last_name$", @user.last_name)
       doc.replace("$user_bio$", @user.bio)
       
-      # Write the document back to a temporary file
-      tmp_file = TempFile.new('word_tempate', "#{Rails.root}/tmp")
-      doc.commit(tmp_file)
+      doc.commit
 
       # Respond to the request by sending the temp file
       send_file tmp_file.path, filename: "user_#{@user.id}_report.docx", disposition: 'attachment'
     end
   end
+end
+
+# replace & generate docx with block
+DocxReplace::Doc.new("#{Rails.root}/lib/docx_templates/my_template.docx", "#{Rails.root}/tmp/result.docx") do |doc|
+  doc.replace("$first_name$", @user.first_name)
+  doc.replace("$last_name$", @user.last_name)
+  doc.replace("$user_bio$", @user.bio)
+  
+  doc.commit
 end
 ```
 
